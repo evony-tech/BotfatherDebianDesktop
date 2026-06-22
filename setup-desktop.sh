@@ -75,19 +75,20 @@ polkit.addRule(function(action, subject) {
 EOF
 systemctl enable --now xrdp
 
-# 4. Provision the Windows-on-Linux Architecture (Wine via Official WineHQ)
-echo "[+] Enabling multi-architecture support and installing WineHQ..."
-dpkg --add-architecture i386 || true
+# 4. Provision the Windows-on-Linux Architecture (Pure 64-bit / WoW64 Engine)
+echo "[+] Purging broken multi-arch layers and deploying pure 64-bit Wine..."
 
-# Download and register the official WineHQ secure signing keys
-mkdir -pm755 /etc/apt/keyrings
-wget -q -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
-wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources
+# Clean up any partial WineHQ installations from previous attempts
+apt-get remove -y winehq-staging wine-staging winehq-stable wine-stable wine32 wine || true
+rm -f /etc/apt/sources.list.d/winehq*.sources || true
 
-# Synchronize indexes and install the decoupled deployment branch
+# Forcefully remove the i386 architecture to permanently kill dependency hell
+dpkg --remove-architecture i386 || true
+
+# Update and install the native Debian 64-bit WoW64 execution framework
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y --install-recommends winehq-staging
+apt-get install -y wine64
 
 # 5. Build and Configure Headscale Private Mesh Coordinator
 echo "[+] Installing/Repairing Headscale VPN server..."
