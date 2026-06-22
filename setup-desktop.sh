@@ -4,6 +4,7 @@
 # =====================================================================
 
 set -e
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 if [ "$EUID" -ne 0 ]; then
   echo "[-] Error: This script must be run as root."
@@ -74,11 +75,19 @@ polkit.addRule(function(action, subject) {
 EOF
 systemctl enable --now xrdp
 
-# 4. Provision the Windows-on-Linux Architecture (Wine Multi-Arch)
-echo "[+] Enabling multi-architecture support and installing Wine..."
+# 4. Provision the Windows-on-Linux Architecture (Wine via Official WineHQ)
+echo "[+] Enabling multi-architecture support and installing WineHQ..."
 dpkg --add-architecture i386 || true
+
+# Download and register the official WineHQ secure signing keys
+mkdir -pm755 /etc/apt/keyrings
+wget -q -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+wget -q -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources
+
+# Synchronize indexes and install the decoupled deployment branch
 apt-get update
-apt-get install -y wine wine64 wine32
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y --install-recommends winehq-staging
 
 # 5. Build and Configure Headscale Private Mesh Coordinator
 echo "[+] Installing/Repairing Headscale VPN server..."
