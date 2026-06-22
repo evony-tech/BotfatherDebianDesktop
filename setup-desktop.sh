@@ -52,7 +52,7 @@ read -p "Enter your Home IP address to whitelist for direct SSH (leave blank to 
 echo "[+] Installing/Repairing XFCE4 desktop, utilities, and native browser..."
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc
+apt-get install -y xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
