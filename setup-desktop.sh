@@ -16,7 +16,7 @@ echo "  Deploying Hardened XFCE + Auto-Login + Wine Bot Farm   "
 echo "========================================================="
 
 # 1. Gather Configuration Details Upfront with Safety Loops
-PUBLIC_IP=$(curl -s https://ifconfig.me || curl -s icanhazip.com || echo "127.0.0.1")
+PUBLIC_IP=$(curl -4 -s https://ifconfig.me || curl -4 -s icanhazip.com || echo "127.0.0.1")
 echo "[+] Detected Public IP: $PUBLIC_IP"
 read -p "Press ENTER to confirm, or type the correct public IP manually: " USER_IP
 if [ ! -z "$USER_IP" ]; then PUBLIC_IP=$USER_IP; fi
