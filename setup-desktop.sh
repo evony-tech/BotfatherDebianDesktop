@@ -223,7 +223,7 @@ wget -q "https://github.com/darknebular/bypassing-flash-timebomb/releases/downlo
 chmod 644 /usr/lib/mozilla/plugins/libflashplayer.so
 
 echo "[+] Deploying standalone Pale Moon binary distribution..."
-wget -q "https://archive.palemoon.org/palemoon/33.x/33.4.0.1/palemoon-33.4.0.1.linux-x86_64-gtk3.tar.xz" -O /tmp/palemoon.tar.xz || true
+wget -q "https://relapi.palemoon.org/release/palemoon-33.4.0.1.linux-x86_64-gtk3.tar.xz" -O /tmp/palemoon.tar.xz || true
 tar -xf /tmp/palemoon.tar.xz -C /opt/ || true
 ln -sf /opt/palemoon/palemoon /usr/bin/palemoon || true
 rm -f /tmp/palemoon.tar.xz
