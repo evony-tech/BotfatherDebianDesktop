@@ -48,12 +48,20 @@ done
 
 read -p "Enter your Home IP address to whitelist for direct SSH (leave blank to ONLY allow SSH via the VPN or VPS Console): " HOME_IP
 
-# 2. Update System and Install Core Packages
-echo "[+] Installing XFCE4, utilities, native browser, and Wine Multi-Arch..."
+# 2. Update System and Install Core Packages + Pale Moon Repositories
+echo "[+] Configuring Pale Moon software channels..."
+OS_RELEASE=$(lsb_release -rs 2>/dev/null || cat /etc/debian_version | cut -d'.' -f1)
+# Default fallback handling for Debian versions
+if [ "$OS_RELEASE" == "11" ]; then SUITE="Debian_11"; elif [ "$OS_RELEASE" == "13" ]; then SUITE="Debian_Testing"; else SUITE="Debian_12"; fi
+
+echo "deb http://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/ /" > /etc/apt/sources.list.d/home:stevenpusser.list
+curl -fsSL "https://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/home_stevenpusser.gpg
+
+echo "[+] Installing XFCE4, utilities, native Pale Moon, and Wine Multi-Arch..."
 dpkg --add-architecture i386
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime
+apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime palemoon
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
@@ -210,16 +218,27 @@ wget -q "https://github.com/evony-tech/NeatBotfather/releases/download/1.9.6.5/T
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Downloads"
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine "/home/$FARM_USER/Downloads/Botfather-Setup.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- || true
 
-# 12. Download and Install NeatFlashBrowser
-echo "[+] Fetching and installing NeatFlashBrowser..."
-wget -q "https://neato3.com/NeatFlashBrowser-Setup.exe" -O "/home/$FARM_USER/Downloads/NeatFlashBrowser-Setup.exe" || true
-chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Downloads"
-sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine "/home/$FARM_USER/Downloads/NeatFlashBrowser-Setup.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- || true
+# 12. Inject Clean Time-Bomb-Free Native Linux Flash Player into Pale Moon
+echo "[+] Delivering un-throttled Linux NPAPI Flash Layer into System Nodes..."
+mkdir -p /usr/lib/mozilla/plugins/
+wget -q "https://github.com/darknebular/bypassing-flash-timebomb/releases/download/v1.0/libflashplayer.so" -O /usr/lib/mozilla/plugins/libflashplayer.so
+chmod 644 /usr/lib/mozilla/plugins/libflashplayer.so
 
-# 13. Override Wine Browser: HTTP to Flash Client, HTTPS to Native Linux Firefox
-echo "[+] Injecting split-routing registry patch..."
+# Set default landing target homepage rules to the NeatPortal download thread for the botfarmer profile
+mkdir -p "/home/$FARM_USER/.moonchild productions/pale moon"
+sudo -u "$FARM_USER" palemoon --headless & PM_PID=$!; sleep 3; kill $PM_PID || true
+PM_PROFILE=$(ls "/home/$FARM_USER/.moonchild productions/pale moon" | grep default)
 
-# Forcefully kill any lingering Wine background processes holding the C:\ drive open
+if [ ! -z "$PM_PROFILE" ]; then
+cat << 'EOF' >> "/home/$FARM_USER/.moonchild productions/pale moon/$PM_PROFILE/prefs.js"
+user_pref("browser.startup.homepage", "http://forum.neatportal.com/viewtopic.php?f=49&t=6747");
+user_pref("browser.startup.page", 1);
+EOF
+chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/.moonchild productions"
+fi
+
+# 13. Override Wine Browser: Global Split Routing Tunnel to Native Linux Pale Moon
+echo "[+] Intercepting Wine URL triggers and redirecting out to native system..."
 sudo -u "$FARM_USER" wineserver -k || true
 sleep 2
 
@@ -227,10 +246,10 @@ cat << EOF > "/home/$FARM_USER/default-browser.reg"
 Windows Registry Editor Version 5.00
 
 [HKEY_CURRENT_USER\Software\Classes\http\shell\open\command]
-@="\"C:\\Program Files (x86)\\NeatFlashBrowser\\NeatFlashBrowser.exe\" \"%1\""
+@="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
 
 [HKEY_CLASSES_ROOT\http\shell\open\command]
-@="\"C:\\Program Files (x86)\\NeatFlashBrowser\\NeatFlashBrowser.exe\" \"%1\""
+@="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
 
 [HKEY_CURRENT_USER\Software\Classes\https\shell\open\command]
 @="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
@@ -239,30 +258,30 @@ Windows Registry Editor Version 5.00
 @="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
 EOF
 chown "$FARM_USER:$FARM_USER" "/home/$FARM_USER/default-browser.reg"
-
-# Inject silently (/S) to prevent hanging
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine regedit /S "/home/$FARM_USER/default-browser.reg" || true
+
+# Force underlying Linux desktop architecture to route ALL system URLs straight into Flash-enabled Pale Moon
+sudo -u "$FARM_USER" xdg-settings set default-web-browser palemoon.desktop || true
+xdg-mime default palemoon.desktop x-scheme-handler/http || true
+xdg-mime default palemoon.desktop x-scheme-handler/https || true
 
 # 14. Generate Foolproof Desktop Shortcuts & Instructions
 echo "[+] Generating Desktop Shortcuts..."
 mkdir -p "/home/$FARM_USER/Desktop"
 
-cp /usr/share/applications/firefox-esr.desktop "/home/$FARM_USER/Desktop/firefox.desktop" || true
-
-cat << EOF > "/home/$FARM_USER/Desktop/NeatFlashBrowser.desktop"
+cat << EOF > "/home/$FARM_USER/Desktop/PaleMoon.desktop"
 [Desktop Entry]
-Name=NeatFlashBrowser
-Exec=env WINEPREFIX="/home/$FARM_USER/.wine" wine "C:\\Program Files (x86)\\NeatFlashBrowser\\NeatFlashBrowser.exe"
+Name=Flash Game Client (Pale Moon)
+Exec=palemoon
 Type=Application
-StartupNotify=true
-Icon=wine
+Icon=palemoon
 Terminal=false
 EOF
 
 cat << EOF > "/home/$FARM_USER/Desktop/Botfather.desktop"
 [Desktop Entry]
 Name=The NEAT Botfather
-Exec=env WINEPREFIX="/home/$FARM_USER/.wine" wine "C:\\Program Files\\TheNEATBotfather\\TheNEATBotfather.exe"
+Exec=env WINEPREFIX="/home/$FARM_USER/.wine" wine "C:\\\\Program Files\\\\TheNEATBotfather\\\\TheNEATBotfather.exe"
 Type=Application
 StartupNotify=true
 Icon=wine
