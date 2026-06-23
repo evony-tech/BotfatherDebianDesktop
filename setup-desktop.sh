@@ -53,7 +53,7 @@ echo "[+] Installing XFCE4, utilities, native browser, and Wine Multi-Arch..."
 dpkg --add-architecture i386
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo wine wine64 wine32
+apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
@@ -180,13 +180,16 @@ echo "[+] Pre-initializing Wine prefix and .NET Framework for '$FARM_USER'..."
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wineboot -u
 sleep 3
 
-# Download and explicitly install the correct Wine-Mono engine
 mkdir -p "/home/$FARM_USER/Downloads"
 wget -q "https://dl.winehq.org/wine/wine-mono/10.0.0/wine-mono-10.0.0-x86.msi" -O "/home/$FARM_USER/Downloads/wine-mono.msi" || true
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Downloads"
 
 echo "[+] Injecting Wine-Mono silently..."
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine msiexec /i "Z:\\home\\$FARM_USER\\Downloads\\wine-mono.msi" /qn || true
+
+# CRITICAL FLUSH: Stop the wine server to commit Mono changes permanently to the registry
+sudo -u "$FARM_USER" wineserver -w || true
+sudo -u "$FARM_USER" wineserver -k || true
 sleep 3
 
 # 11. Download and Install TheNEATBotfather
