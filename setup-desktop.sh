@@ -193,22 +193,22 @@ sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /ba
 sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitorrdp-0/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
 sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitorVirtual1/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
 
-# 10. Pre-initialize the Wine Environment and Inject .NET (Mono)
-echo "[+] Pre-initializing Wine prefix and .NET Framework for '$FARM_USER'..."
+# 10. Pre-initialize the Wine Environment and Inject .NET Framework via Cache
+echo "[+] Constructing local Wine storage directories..."
+mkdir -p "/home/$FARM_USER/.cache/wine"
+
+echo "[+] Staging Wine-Mono bundle straight to shared directory nodes..."
+wget -q "https://dl.winehq.org/wine/wine-mono/10.0.0/wine-mono-10.0.0-x86.msi" -O "/home/$FARM_USER/.cache/wine/wine-mono-10.0.0-x86.msi" || true
+chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/.cache"
+
+echo "[+] Initializing full multi-architecture container structures..."
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wineboot -u
 sleep 3
 
-mkdir -p "/home/$FARM_USER/Downloads"
-wget -q "https://dl.winehq.org/wine/wine-mono/10.0.0/wine-mono-10.0.0-x86.msi" -O "/home/$FARM_USER/Downloads/wine-mono.msi" || true
-chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Downloads"
-
-echo "[+] Injecting Wine-Mono silently..."
-sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine msiexec /i "Z:\\home\\$FARM_USER\\Downloads\\wine-mono.msi" /qn || true
-
-# CRITICAL FLUSH: Stop the wine server to commit Mono changes permanently to the registry
+# Flush and ensure tracking handles register correctly
 sudo -u "$FARM_USER" wineserver -w || true
 sudo -u "$FARM_USER" wineserver -k || true
-sleep 3
+sleep 2
 
 # 11. Download and Install TheNEATBotfather
 echo "[+] Fetching and installing TheNEATBotfather..."
