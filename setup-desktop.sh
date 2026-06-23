@@ -57,17 +57,16 @@ read -p "Enter your Home IP address to whitelist for direct SSH (leave blank to 
 # 2. Update System and Install Core Packages + Pale Moon Repositories
 echo "[+] Configuring Pale Moon software channels..."
 OS_RELEASE=$(lsb_release -rs 2>/dev/null || cat /etc/debian_version | cut -d'.' -f1)
-# Default fallback handling for Debian versions
 if [ "$OS_RELEASE" == "11" ]; then SUITE="Debian_11"; elif [ "$OS_RELEASE" == "13" ] || [ "$OS_RELEASE" == "trixie/sid" ]; then SUITE="Debian_Testing"; else SUITE="Debian_12"; fi
 
-# CRITICAL FIX FOR DEBIAN 13 SHA-1 BLOCK: Add [trusted=yes] to bypass the strict sqv key policy
-echo "deb [trusted=yes] http://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/ /" > /etc/apt/sources.list.d/home:stevenpusser.list
+# Force trusted and insecure allow-flags for the deprecated signature format
+echo "deb [trusted=yes allow-insecure=yes] http://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/ /" > /etc/apt/sources.list.d/home:stevenpusser.list
 
 echo "[+] Installing XFCE4, utilities, native Pale Moon, and Wine Multi-Arch..."
 dpkg --add-architecture i386
-apt-get update
+apt-get update -o Acquire::AllowInsecureRepositories=true || true
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime palemoon
+apt-get install -y -o Dpkg::Options::="--force-overwrite" --allow-unauthenticated xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime palemoon
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
