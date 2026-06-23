@@ -175,10 +175,19 @@ cat << EOF > "/home/$FARM_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-de
 EOF
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Pictures" "/home/$FARM_USER/.config"
 
-# 10. Pre-initialize the Wine Environment
-echo "[+] Pre-initializing Wine prefix for '$FARM_USER'..."
+# 10. Pre-initialize the Wine Environment and Inject .NET (Mono)
+echo "[+] Pre-initializing Wine prefix and .NET Framework for '$FARM_USER'..."
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wineboot -u
+sleep 3
+
+# Download and explicitly install the correct Wine-Mono engine
 mkdir -p "/home/$FARM_USER/Downloads"
+wget -q "https://dl.winehq.org/wine/wine-mono/10.0.0/wine-mono-10.0.0-x86.msi" -O "/home/$FARM_USER/Downloads/wine-mono.msi" || true
+chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Downloads"
+
+echo "[+] Injecting Wine-Mono silently..."
+sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine msiexec /i "Z:\\home\\$FARM_USER\\Downloads\\wine-mono.msi" /qn || true
+sleep 3
 
 # 11. Download and Install TheNEATBotfather
 echo "[+] Fetching and installing TheNEATBotfather..."
