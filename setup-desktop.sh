@@ -194,6 +194,11 @@ sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine "/home/$FARM_USER/Downloads
 
 # 13. Override Wine Browser: HTTP to Flash Client, HTTPS to Native Linux Firefox
 echo "[+] Injecting split-routing registry patch..."
+
+# Forcefully kill any lingering Wine background processes holding the C:\ drive open
+sudo -u "$FARM_USER" wineserver -k || true
+sleep 2
+
 cat << EOF > "/home/$FARM_USER/default-browser.reg"
 Windows Registry Editor Version 5.00
 
@@ -210,7 +215,9 @@ Windows Registry Editor Version 5.00
 @="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
 EOF
 chown "$FARM_USER:$FARM_USER" "/home/$FARM_USER/default-browser.reg"
-sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine regedit "/home/$FARM_USER/default-browser.reg"
+
+# Inject silently (/S) to prevent hanging
+sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine regedit /S "/home/$FARM_USER/default-browser.reg" || true
 
 # 14. Generate Foolproof Desktop Shortcuts & Instructions
 echo "[+] Generating Desktop Shortcuts..."
