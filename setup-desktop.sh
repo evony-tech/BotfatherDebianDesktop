@@ -117,9 +117,17 @@ echo "[+] Resetting and locking down Firewall boundaries..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
+
+# Publicly exposed handshakes
 ufw allow 8080/tcp     # Headscale Public handshake port
+
+# Secure Private Network (Tailscale) boundaries
 ufw allow in on tailscale0 to any port 3389  # Secure RDP
 ufw allow in on tailscale0 to any port 22    # Secure SSH
+ufw allow in on tailscale0 to any port 8025  # Secure Botfather Port
+
+# Local Loopback communication
+ufw allow in on lo to any port 8025          # Internal communications
 
 if [ ! -z "$HOME_IP" ]; then
     echo "[+] Whitelisting direct SSH access for $HOME_IP..."
