@@ -22,12 +22,18 @@ echo "[+] Detected Public IP: $PUBLIC_IP"
 read -p "Press ENTER to confirm, or type the correct public IP manually: " USER_IP
 if [ ! -z "$USER_IP" ]; then PUBLIC_IP=$USER_IP; fi
 
-# Prompt for custom username
+# Prompt for custom username (Defaults to botfarmer on ENTER)
 while true; do
-  read -p "Enter the default user account name for the bot farm (e.g., botfarmer): " FARM_USER
-  if [[ -z "$FARM_USER" || "$FARM_USER" == "root" ]]; then
-    echo "[-] Error: Username cannot be blank or 'root'."
+  read -p "Enter the default user account name for the bot farm [botfarmer]: " FARM_USER
+  # If the user pressed ENTER without typing anything, set the default
+  if [ -z "$FARM_USER" ]; then 
+    FARM_USER="botfarmer"
+  fi
+
+  if [ "$FARM_USER" == "root" ]; then
+    echo "[-] Error: Username cannot be 'root'."
   else
+    echo "[+] Using username: $FARM_USER"
     break
   fi
 done
@@ -52,10 +58,10 @@ read -p "Enter your Home IP address to whitelist for direct SSH (leave blank to 
 echo "[+] Configuring Pale Moon software channels..."
 OS_RELEASE=$(lsb_release -rs 2>/dev/null || cat /etc/debian_version | cut -d'.' -f1)
 # Default fallback handling for Debian versions
-if [ "$OS_RELEASE" == "11" ]; then SUITE="Debian_11"; elif [ "$OS_RELEASE" == "13" ]; then SUITE="Debian_Testing"; else SUITE="Debian_12"; fi
+if [ "$OS_RELEASE" == "11" ]; then SUITE="Debian_11"; elif [ "$OS_RELEASE" == "13" ] || [ "$OS_RELEASE" == "trixie/sid" ]; then SUITE="Debian_Testing"; else SUITE="Debian_12"; fi
 
-echo "deb http://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/ /" > /etc/apt/sources.list.d/home:stevenpusser.list
-curl -fsSL "https://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/Release.key" | gpg --dearmor > /etc/apt/trusted.gpg.d/home_stevenpusser.gpg
+# CRITICAL FIX FOR DEBIAN 13 SHA-1 BLOCK: Add [trusted=yes] to bypass the strict sqv key policy
+echo "deb [trusted=yes] http://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/ /" > /etc/apt/sources.list.d/home:stevenpusser.list
 
 echo "[+] Installing XFCE4, utilities, native Pale Moon, and Wine Multi-Arch..."
 dpkg --add-architecture i386
