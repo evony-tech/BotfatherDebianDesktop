@@ -53,7 +53,7 @@ echo "[+] Installing XFCE4, utilities, native browser, and Wine Multi-Arch..."
 dpkg --add-architecture i386
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11
+apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
@@ -174,6 +174,10 @@ cat << EOF > "/home/$FARM_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-de
 </channel>
 EOF
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Pictures" "/home/$FARM_USER/.config"
+# Force apply across common XFCE monitor properties natively
+sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
+sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitorrdp-0/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
+sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitorVirtual1/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
 
 # 10. Pre-initialize the Wine Environment and Inject .NET (Mono)
 echo "[+] Pre-initializing Wine prefix and .NET Framework for '$FARM_USER'..."
