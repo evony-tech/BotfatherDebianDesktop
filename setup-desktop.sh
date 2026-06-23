@@ -54,19 +54,12 @@ done
 
 read -p "Enter your Home IP address to whitelist for direct SSH (leave blank to ONLY allow SSH via the VPN or VPS Console): " HOME_IP
 
-# 2. Update System and Install Core Packages + Pale Moon Repositories
-echo "[+] Configuring Pale Moon software channels..."
-OS_RELEASE=$(lsb_release -rs 2>/dev/null || cat /etc/debian_version | cut -d'.' -f1)
-if [ "$OS_RELEASE" == "11" ]; then SUITE="Debian_11"; elif [ "$OS_RELEASE" == "13" ] || [ "$OS_RELEASE" == "trixie/sid" ]; then SUITE="Debian_Testing"; else SUITE="Debian_12"; fi
-
-# Force trusted and insecure allow-flags for the deprecated signature format
-echo "deb [trusted=yes allow-insecure=yes] http://download.opensuse.org/repositories/home:/stevenpusser/$SUITE/ /" > /etc/apt/sources.list.d/home:stevenpusser.list
-
-echo "[+] Installing XFCE4, utilities, native Pale Moon, and Wine Multi-Arch..."
+# 2. Update System and Install Core Packages
+echo "[+] Installing XFCE4, utilities, and Wine Multi-Arch..."
 dpkg --add-architecture i386
-apt-get update -o Acquire::AllowInsecureRepositories=true || true
+apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -o Dpkg::Options::="--force-overwrite" --allow-unauthenticated xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime palemoon
+apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime tar xz-utils
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
@@ -223,15 +216,21 @@ wget -q "https://github.com/evony-tech/NeatBotfather/releases/download/1.9.6.5/T
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Downloads"
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine "/home/$FARM_USER/Downloads/Botfather-Setup.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- || true
 
-# 12. Inject Clean Time-Bomb-Free Native Linux Flash Player into Pale Moon
+# 12. Deploy Standalone Pale Moon Browser & Inject Native Flash Player
 echo "[+] Delivering un-throttled Linux NPAPI Flash Layer into System Nodes..."
 mkdir -p /usr/lib/mozilla/plugins/
 wget -q "https://github.com/darknebular/bypassing-flash-timebomb/releases/download/v1.0/libflashplayer.so" -O /usr/lib/mozilla/plugins/libflashplayer.so
 chmod 644 /usr/lib/mozilla/plugins/libflashplayer.so
 
+echo "[+] Deploying standalone Pale Moon binary distribution..."
+wget -q "https://archive.palemoon.org/palemoon/33.x/33.4.0.1/palemoon-33.4.0.1.linux-x86_64-gtk3.tar.xz" -O /tmp/palemoon.tar.xz || true
+tar -xf /tmp/palemoon.tar.xz -C /opt/ || true
+ln -sf /opt/palemoon/palemoon /usr/bin/palemoon || true
+rm -f /tmp/palemoon.tar.xz
+
 # Set default landing target homepage rules to the NeatPortal download thread for the botfarmer profile
 mkdir -p "/home/$FARM_USER/.moonchild productions/pale moon"
-sudo -u "$FARM_USER" palemoon --headless & PM_PID=$!; sleep 3; kill $PM_PID || true
+sudo -u "$FARM_USER" HOME="/home/$FARM_USER" xvfb-run -a /opt/palemoon/palemoon --headless & PM_PID=$!; sleep 4; kill $PM_PID || true
 PM_PROFILE=$(ls "/home/$FARM_USER/.moonchild productions/pale moon" | grep default)
 
 if [ ! -z "$PM_PROFILE" ]; then
