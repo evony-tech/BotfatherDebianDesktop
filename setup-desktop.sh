@@ -48,11 +48,12 @@ done
 
 read -p "Enter your Home IP address to whitelist for direct SSH (leave blank to ONLY allow SSH via the VPN or VPS Console): " HOME_IP
 
-# 2. Update System and Install XFCE Desktop + Utilities (Debian 13 Polkit Fix)
-echo "[+] Installing/Repairing XFCE4 desktop, utilities, and native browser..."
+# 2. Update System and Install Core Packages
+echo "[+] Installing XFCE4, utilities, native browser, and Wine Multi-Arch..."
+dpkg --add-architecture i386
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo
+apt-get install -y xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb firefox-esr jq lightdm x11vnc sudo wine wine64 wine32
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
@@ -75,20 +76,8 @@ polkit.addRule(function(action, subject) {
 EOF
 systemctl enable --now xrdp
 
-# 4. Provision the Windows-on-Linux Architecture (Pure 64-bit / WoW64 Engine)
-echo "[+] Purging broken multi-arch layers and deploying pure 64-bit Wine..."
-
-# Clean up any partial WineHQ installations from previous attempts
-apt-get remove -y winehq-staging wine-staging winehq-stable wine-stable wine32 wine || true
-rm -f /etc/apt/sources.list.d/winehq*.sources || true
-
-# Forcefully remove the i386 architecture to permanently kill dependency hell
-dpkg --remove-architecture i386 || true
-
-# Update and install the native Debian 64-bit WoW64 execution framework
-apt-get update
-export DEBIAN_FRONTEND=noninteractive
-apt-get install -y wine64
+# 4. Provision the Windows-on-Linux Architecture
+echo "[+] Wine Multi-Architecture verified..."
 
 # 5. Build and Configure Headscale Private Mesh Coordinator
 echo "[+] Installing/Repairing Headscale VPN server..."
