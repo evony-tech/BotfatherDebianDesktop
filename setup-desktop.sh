@@ -59,7 +59,8 @@ echo "[+] Installing XFCE4, utilities, and Wine Multi-Arch..."
 dpkg --add-architecture i386
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime tar xz-utils
+# INJECTED: libdbus-glib-1-2 for Pale Moon compatibility on Debian 13
+apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime tar xz-utils libdbus-glib-1-2
 
 # 3. Install and Configure XRDP Server
 echo "[+] Installing and configuring XRDP server..."
@@ -86,11 +87,11 @@ systemctl enable --now xrdp
 echo "[+] Wine Multi-Architecture verified..."
 
 # 5. Build and Configure Headscale Private Mesh Coordinator
-echo "[+] Installing/Repairing Headscale VPN server..."
+echo "[+] Installing/Repairing Headscale VPN server (v0.29.2)..."
 if [ ! -f /usr/bin/headscale ]; then
-  wget -q https://github.com/juanfont/headscale/releases/download/v0.23.0/headscale_0.23.0_linux_amd64.deb
-  apt install ./headscale_0.23.0_linux_amd64.deb -y
-  rm headscale_0.23.0_linux_amd64.deb
+  wget -q https://github.com/juanfont/headscale/releases/download/v0.29.2/headscale_0.29.2_linux_amd64.deb
+  apt install ./headscale_0.29.2_linux_amd64.deb -y
+  rm headscale_0.29.2_linux_amd64.deb
 fi
 
 mkdir -p /etc/headscale
@@ -332,20 +333,23 @@ chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/.config/autostart"
 
 # 17. Configure background x11vnc mirroring service
 echo "[+] Creating screen mirroring pipeline for seamless RDP hook-in..."
-cat << 'EOF' > /etc/systemd/system/x11vnc.service
+cat << EOF > /etc/systemd/system/x11vnc.service
 [Unit]
 Description=x11vnc Mirror Service for XRDP
 After=display-manager.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/x11vnc -display :0 -auth guess -forever -loop -noxdamage -repeat -rfbport 5900 -shared
+# INJECTED: Hardened loopback isolation and explicit password routing
+ExecStart=/usr/bin/x11vnc -display :0 -auth guess -forever -loop -noxdamage -repeat -rfbport 5900 -shared -listen 127.0.0.1 -passwd $RDP_PASSWORD
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+# INJECTED: Secure the dynamic VNC credentials from unprivileged reads
+chmod 600 /etc/systemd/system/x11vnc.service
 systemctl daemon-reload
 systemctl enable --now x11vnc
 
