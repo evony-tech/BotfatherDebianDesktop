@@ -5,18 +5,20 @@ A fully automated, self-provisioning deployment script that transforms a fresh D
 ## Overview
 Running high-density bot instances (100+) requires extreme resource efficiency and ironclad security. This repository provides a master script that eliminates the overhead and licensing costs of Windows Server. It builds a highly optimized Linux foundation (Debian + XFCE + Wine) and automatically locks the entire server behind a private mesh VPN.
 
-## 🚀 One-Line Installation
+### 🚀 Installation Options
 
-### One-Line Installation
+This script is designed for fresh **Debian 13 (Trixie)** installations and can be run completely unattended. 
 
-Log into your fresh Debian 13 VPS as root (via SSH or your host's web console) and run the following command:
+#### Option 1: Automated Cloud Deployment (Hetzner, DigitalOcean, etc.)
+When creating your server, look for the **Cloud-Init** or **User Data** text box in your provider's dashboard. Simply paste the raw contents of `setup-desktop.sh` directly into that box. 
+* The server will automatically install everything during its first boot.
+* Once the server is online, SSH in as `root` and type `cat /root/botfarm_setup_instructions.txt` to retrieve your auto-generated password and Tailscale configuration.
+
+#### Option 2: One-Line SSH Installer
+If you already have a server running, log in as `root` via SSH and paste the following command. 
 
 ```bash
-curl -sSL [https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh](https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh) | sudo bash
-```
-
-*(Note: You will be prompted to create a secure password and an optional Home IP whitelist during installation).*
-
+wget -qO- [https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh](https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh) | bash
 ---
 
 ## 🔍 What Exactly Does This Script Do?
