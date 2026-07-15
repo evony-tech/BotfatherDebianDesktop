@@ -18,7 +18,7 @@ When creating your server, look for the **Cloud-Init** or **User Data** text box
 If you already have a server running, log in as `root` via SSH and paste the following command. 
 
 ```bash
-wget -qO- [https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh](https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh) | bash
+wget -qO- https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh | bash
 ```
 ---
 
