@@ -19,6 +19,7 @@ If you already have a server running, log in as `root` via SSH and paste the fol
 
 ```bash
 wget -qO- [https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh](https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh) | bash
+```
 ---
 
 ## 🔍 What Exactly Does This Script Do?
