@@ -1,6 +1,7 @@
 #!/bin/bash
 # =====================================================================
 # MASTER NEATBOT FARM PROVISIONING & AUTO-HEAL SCRIPT (DEBIAN 11/12/13)
+# ZERO-TOUCH UNATTENDED INSTALLATION VERSION
 # =====================================================================
 
 set -e
@@ -11,55 +12,30 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-clear
 echo "========================================================="
 echo "  Deploying Hardened XFCE + Auto-Login + Wine Bot Farm   "
 echo "========================================================="
 
-# 1. Gather Configuration Details Upfront with Safety Loops
-PUBLIC_IP=$(curl -4 -s https://ifconfig.me || curl -4 -s icanhazip.com || echo "127.0.0.1")
+# 1. Unattended Configuration Details
+# FIXED: Swapped curl for wget to support barebones Debian ISOs
+PUBLIC_IP=$(wget -4 -qO- https://ifconfig.me || wget -4 -qO- icanhazip.com || echo "127.0.0.1")
 echo "[+] Detected Public IP: $PUBLIC_IP"
-read -p "Press ENTER to confirm, or type the correct public IP manually: " USER_IP
-if [ ! -z "$USER_IP" ]; then PUBLIC_IP=$USER_IP; fi
 
-# Prompt for custom username (Defaults to botfarmer on ENTER)
-while true; do
-  read -p "Enter the default user account name for the bot farm [botfarmer]: " FARM_USER
-  # If the user pressed ENTER without typing anything, set the default
-  if [ -z "$FARM_USER" ]; then 
-    FARM_USER="botfarmer"
-  fi
+# Use environment variables if set, otherwise fallback to defaults
+FARM_USER=${FARM_USER:-"botfarmer"}
+HOME_IP=${HOME_IP:-""}
 
-  if [ "$FARM_USER" == "root" ]; then
-    echo "[-] Error: Username cannot be 'root'."
-  else
-    echo "[+] Using username: $FARM_USER"
-    break
-  fi
-done
-
-# Password verification loop
-while true; do
-  read -s -p "Enter a SECURE password for the RDP user account ($FARM_USER): " PASS1
-  echo ""
-  read -s -p "Confirm the password: " PASS2
-  echo ""
-  if [ "$PASS1" == "$PASS2" ]; then
-    RDP_PASSWORD="$PASS1"
-    break
-  else
-    echo "[-] Passwords do not match. Please try again."
-  fi
-done
-
-read -p "Enter your Home IP address to whitelist for direct SSH (leave blank to ONLY allow SSH via the VPN or VPS Console): " HOME_IP
+# Auto-generate a secure 16-character password if not supplied
+if [ -z "$RDP_PASSWORD" ]; then
+  RDP_PASSWORD=$(tr -dc 'A-Za-z0-9!@#%^&*' </dev/urandom | head -c 16)
+  echo "[+] Auto-generated RDP Password."
+fi
 
 # 2. Update System and Install Core Packages
 echo "[+] Installing XFCE4, utilities, and Wine Multi-Arch..."
 dpkg --add-architecture i386
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-# INJECTED: libdbus-glib-1-2 for Pale Moon compatibility on Debian 13
 apt-get install -y -o Dpkg::Options::="--force-overwrite" xfce4 xfce4-goodies curl wget ufw sed gnupg ca-certificates polkitd pkexec xvfb jq lightdm x11vnc sudo wine wine64 wine32 dbus-x11 faketime tar xz-utils libdbus-glib-1-2
 
 # 3. Install and Configure XRDP Server
@@ -68,11 +44,8 @@ apt-get install -y xrdp
 if getent group ssl-cert >/dev/null; then
   adduser xrdp ssl-cert || true
 fi
-
-# Set XFCE as the global default desktop engine for XRDP connections
 sed -i 's|test -x /etc/X11/Xsession && exec /etc/X11/Xsession|startxfce4|g' /etc/xrdp/startwm.sh
 
-# Fix Linux Polkit pop-up
 mkdir -p /etc/polkit-1/rules.d
 cat << 'EOF' > /etc/polkit-1/rules.d/50-color-management.rules
 polkit.addRule(function(action, subject) {
@@ -106,17 +79,13 @@ headscale users create botuser || true
 # 6. Bind the Host to its Private Network
 echo "[+] Initializing localized VPN endpoint client connection..."
 if [ ! -f /usr/bin/tailscale ]; then
-  curl -fsSL https://tailscale.com/install.sh | sh
+  # FIXED: Swapped curl for wget
+  wget -qO- https://tailscale.com/install.sh | sh
 fi
 
 HOST_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h --output json 2>/dev/null | jq -r '.key' 2>/dev/null || headscale preauthkeys create --user botuser --expiration 24h | awk '{print $NF}')
-
 tailscale up --login-server http://127.0.0.1:8080 --authkey "$HOST_AUTH_KEY" || true
-
-# Grab internal VPN IP
 VPN_IP=$(tailscale ip -4 || echo "100.64.0.1")
-
-# Generate a key for the user's home computer
 HOME_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h --output json 2>/dev/null | jq -r '.key' 2>/dev/null || headscale preauthkeys create --user botuser --expiration 24h | awk '{print $NF}')
 
 # 7. Apply the UFW Firewall Security Hardening
@@ -124,17 +93,11 @@ echo "[+] Resetting and locking down Firewall boundaries..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
-
-# Publicly exposed handshakes
-ufw allow 8080/tcp     # Headscale Public handshake port
-
-# Secure Private Network (Tailscale) boundaries
-ufw allow in on tailscale0 to any port 3389  # Secure RDP
-ufw allow in on tailscale0 to any port 22    # Secure SSH
-ufw allow in on tailscale0 to any port 8025  # Secure Botfather Port
-
-# Local Loopback communication
-ufw allow in on lo to any port 8025          # Internal communications
+ufw allow 8080/tcp
+ufw allow in on tailscale0 to any port 3389
+ufw allow in on tailscale0 to any port 22
+ufw allow in on tailscale0 to any port 8025
+ufw allow in on lo to any port 8025
 
 if [ ! -z "$HOME_IP" ]; then
     echo "[+] Whitelisting direct SSH access for $HOME_IP..."
@@ -145,12 +108,11 @@ ufw --force enable
 # 8. Create or Update the Desktop User Profile
 echo "[+] Initializing/Verifying system profile for '$FARM_USER'..."
 if id "$FARM_USER" &>/dev/null; then
-  echo "[*] User '$FARM_USER' already exists. Synchronizing password and environment..."
+  echo "[*] User '$FARM_USER' already exists."
 else
   useradd -m -s /bin/bash "$FARM_USER"
 fi
 echo "$FARM_USER:$RDP_PASSWORD" | chpasswd
-
 echo "startxfce4" > "/home/$FARM_USER/.xsession"
 chown "$FARM_USER:$FARM_USER" "/home/$FARM_USER/.xsession"
 
@@ -189,7 +151,6 @@ cat << EOF > "/home/$FARM_USER/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-de
 </channel>
 EOF
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Pictures" "/home/$FARM_USER/.config"
-# Force apply across common XFCE monitor properties natively
 sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
 sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitorrdp-0/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
 sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitorVirtual1/workspace0/last-image -s "/home/$FARM_USER/Pictures/neato-desktop.jpg" --create -t string || true
@@ -197,16 +158,10 @@ sudo -u "$FARM_USER" DISPLAY=:0 dbus-launch xfconf-query -c xfce4-desktop -p /ba
 # 10. Pre-initialize the Wine Environment and Inject .NET Framework via Cache
 echo "[+] Constructing local Wine storage directories..."
 mkdir -p "/home/$FARM_USER/.cache/wine"
-
-echo "[+] Staging Wine-Mono bundle straight to shared directory nodes..."
 wget -q "https://dl.winehq.org/wine/wine-mono/10.0.0/wine-mono-10.0.0-x86.msi" -O "/home/$FARM_USER/.cache/wine/wine-mono-10.0.0-x86.msi" || true
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/.cache"
-
-echo "[+] Initializing full multi-architecture container structures..."
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wineboot -u
 sleep 3
-
-# Flush and ensure tracking handles register correctly
 sudo -u "$FARM_USER" wineserver -w || true
 sudo -u "$FARM_USER" wineserver -k || true
 sleep 2
@@ -222,18 +177,14 @@ echo "[+] Delivering un-throttled Linux NPAPI Flash Layer into System Nodes..."
 mkdir -p /usr/lib/mozilla/plugins/
 wget -q "https://github.com/darknebular/bypassing-flash-timebomb/releases/download/v1.0/libflashplayer.so" -O /usr/lib/mozilla/plugins/libflashplayer.so
 chmod 644 /usr/lib/mozilla/plugins/libflashplayer.so
-
-echo "[+] Deploying standalone Pale Moon binary distribution..."
 wget -q "https://relapi.palemoon.org/release/palemoon-33.4.0.1.linux-x86_64-gtk3.tar.xz" -O /tmp/palemoon.tar.xz || true
 tar -xf /tmp/palemoon.tar.xz -C /opt/ || true
 ln -sf /opt/palemoon/palemoon /usr/bin/palemoon || true
 rm -f /tmp/palemoon.tar.xz
 
-# Set default landing target homepage rules to the NeatPortal download thread for the botfarmer profile
 mkdir -p "/home/$FARM_USER/.moonchild productions/pale moon"
 sudo -u "$FARM_USER" HOME="/home/$FARM_USER" xvfb-run -a /opt/palemoon/palemoon --headless & PM_PID=$!; sleep 4; kill $PM_PID || true
 PM_PROFILE=$(ls "/home/$FARM_USER/.moonchild productions/pale moon" | grep default)
-
 if [ ! -z "$PM_PROFILE" ]; then
 cat << 'EOF' >> "/home/$FARM_USER/.moonchild productions/pale moon/$PM_PROFILE/prefs.js"
 user_pref("browser.startup.homepage", "http://forum.neatportal.com/viewtopic.php?f=49&t=6747");
@@ -246,34 +197,28 @@ fi
 echo "[+] Intercepting Wine URL triggers and redirecting out to native system..."
 sudo -u "$FARM_USER" wineserver -k || true
 sleep 2
-
 cat << EOF > "/home/$FARM_USER/default-browser.reg"
 Windows Registry Editor Version 5.00
 
 [HKEY_CURRENT_USER\Software\Classes\http\shell\open\command]
 @="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
-
 [HKEY_CLASSES_ROOT\http\shell\open\command]
 @="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
-
 [HKEY_CURRENT_USER\Software\Classes\https\shell\open\command]
 @="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
-
 [HKEY_CLASSES_ROOT\https\shell\open\command]
 @="\"C:\\windows\\system32\\winebrowser.exe\" \"%1\""
 EOF
 chown "$FARM_USER:$FARM_USER" "/home/$FARM_USER/default-browser.reg"
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine regedit /S "/home/$FARM_USER/default-browser.reg" || true
 
-# Force underlying Linux desktop architecture to route ALL system URLs straight into Flash-enabled Pale Moon
 sudo -u "$FARM_USER" xdg-settings set default-web-browser palemoon.desktop || true
 xdg-mime default palemoon.desktop x-scheme-handler/http || true
 xdg-mime default palemoon.desktop x-scheme-handler/https || true
 
-# 14. Generate Foolproof Desktop Shortcuts & Instructions
+# 14. Generate Foolproof Desktop Shortcuts
 echo "[+] Generating Desktop Shortcuts..."
 mkdir -p "/home/$FARM_USER/Desktop"
-
 cat << EOF > "/home/$FARM_USER/Desktop/PaleMoon.desktop"
 [Desktop Entry]
 Name=Flash Game Client (Pale Moon)
@@ -292,27 +237,6 @@ StartupNotify=true
 Icon=wine
 Terminal=false
 EOF
-
-cat << EOF > "/home/$FARM_USER/Desktop/Tailscale_Setup_Instructions.txt"
-=====================================================
-    SECURE BOT FARM - HOME CONNECTION INSTRUCTIONS
-=====================================================
-
-To connect your home computer to this private network:
-
-1. Download and install Tailscale: https://tailscale.com/download
-2. Open Command Prompt (cmd.exe) on your Windows machine.
-3. Copy and paste this exact command to link your machine:
-
-   tailscale up --login-server http://$PUBLIC_IP:8080 --authkey $HOME_AUTH_KEY
-
-4. Once connected, open Remote Desktop Connection (mstsc.exe).
-5. Enter this IP: $VPN_IP
-6. Log in with the username: $FARM_USER
-
-=====================================================
-EOF
-
 chmod +x /home/$FARM_USER/Desktop/*.desktop || true
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Desktop"
 
@@ -340,7 +264,6 @@ After=display-manager.service
 
 [Service]
 Type=simple
-# INJECTED: Hardened loopback isolation and explicit password routing
 ExecStart=/usr/bin/x11vnc -display :0 -auth guess -forever -loop -noxdamage -repeat -rfbport 5900 -shared -listen 127.0.0.1 -passwd $RDP_PASSWORD
 Restart=on-failure
 
@@ -348,12 +271,10 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-# INJECTED: Secure the dynamic VNC credentials from unprivileged reads
 chmod 600 /etc/systemd/system/x11vnc.service
 systemctl daemon-reload
 systemctl enable --now x11vnc
 
-# Inject Mirror profile cleanly into XRDP configuration mapping rules
 if ! grep -q "Mirror_VirtualBox_Screen" /etc/xrdp/xrdp.ini; then
 cat << 'EOF' >> /etc/xrdp/xrdp.ini
 
@@ -369,25 +290,26 @@ fi
 
 systemctl restart xrdp
 
-clear
-echo "========================================================="
-echo "   SUCCESS: APPLIANCE IS INSTALLED & AUTO-HEALED!       "
-echo "========================================================="
-echo " Your RDP Username: $FARM_USER"
-echo " Your RDP Password: [Hidden and Confirmed]"
-echo " Server VPN IP:     $VPN_IP"
-echo ""
-echo " --- HOME CONNECTION INSTRUCTIONS ---"
-echo " 1. Install Tailscale on your Home PC (tailscale.com/download)"
-echo " 2. Open Command Prompt (cmd.exe) on your Home PC and paste this exact command:"
-echo ""
-echo "    tailscale up --login-server http://$PUBLIC_IP:8080 --authkey $HOME_AUTH_KEY"
-echo ""
-echo " 3. Once connected, open Remote Desktop Connection (mstsc.exe)."
-echo " 4. Enter $VPN_IP"
-echo " 5. Switch the login dropdown protocol selection option to 'Mirror VirtualBox Screen'."
-echo " 6. Type your password to enter the live boot session."
-echo ""
-echo " Please reboot the virtual machine now to verify the boot sequence:"
-echo " Command: sudo reboot"
-echo "========================================================="
+# 18. Save Credentials for Unattended Retrieval
+cat << EOF > /root/botfarm_setup_instructions.txt
+=====================================================
+   SUCCESS: APPLIANCE IS INSTALLED & AUTO-HEALED!    
+=====================================================
+ Your RDP Username: $FARM_USER
+ Your RDP Password: $RDP_PASSWORD
+ Server VPN IP:     $VPN_IP
+
+ --- HOME CONNECTION INSTRUCTIONS ---
+ 1. Install Tailscale on your Home PC (tailscale.com/download)
+ 2. Open Command Prompt (cmd.exe) on your Home PC and paste this exact command:
+
+    tailscale up --login-server http://$PUBLIC_IP:8080 --authkey $HOME_AUTH_KEY
+
+ 3. Once connected, open Remote Desktop Connection (mstsc.exe).
+ 4. Enter $VPN_IP
+ 5. Switch the login dropdown protocol option to 'Mirror VirtualBox Screen'.
+ 6. Type your password to enter the live boot session.
+=====================================================
+EOF
+
+cat /root/botfarm_setup_instructions.txt
