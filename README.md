@@ -7,10 +7,12 @@ Running high-density bot instances (100+) requires extreme resource efficiency a
 
 ## 🚀 One-Line Installation
 
-Log into your fresh Debian 13 VPS as `root` (via SSH or your host's web console) and run the following command:
+### One-Line Installation
+
+Log into your fresh Debian 13 VPS as root (via SSH or your host's web console) and run the following command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh) | sudo bash
+curl -sSL [https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh](https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh) | sudo bash
 ```
 
 *(Note: You will be prompted to create a secure password and an optional Home IP whitelist during installation).*
