@@ -1,0 +1,34 @@
+#cloud-config
+
+# =====================================================================
+# NEATBOT FARM - CLOUD-INIT DEPLOYMENT TEMPLATE
+# Use this file in the 'User Data' or 'Cloud-Init' field of your 
+# hypervisor to automatically provision your server and avoid lockouts.
+# =====================================================================
+
+# 1. Update the apt database on first boot
+package_update: true
+
+# 2. Create a default system administrator account
+# This ensures you always have SSH/Console access to the server, 
+# even if it's deployed on a raw unmanaged hypervisor like Proxmox.
+users:
+  - name: sysadmin
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    
+    # ⚠️ OPTION A: Set a plaintext password for local console access
+    passwd: "ChangeMeImmediately123!"
+    
+    # 🔒 OPTION B: (Recommended) Use your SSH Public Key instead of a password
+    # ssh_authorized_keys:
+    #   - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... user@computer
+
+# 3. Allow SSH password authentication (Helpful for local testing)
+ssh_pwauth: true
+
+# 4. Download and execute the zero-touch provisioning script
+runcmd:
+  - /bin/sh -c 'wget -qO- https://raw.githubusercontent.com/evony-tech/BotfatherDebianDesktop/main/setup-desktop.sh | FARM_USER="botfarmer" bash'
