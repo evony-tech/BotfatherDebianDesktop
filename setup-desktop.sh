@@ -67,9 +67,12 @@ if [ ! -f /usr/bin/headscale ]; then
   rm headscale_0.29.2_linux_amd64.deb
 fi
 
+# Sanitize the IP variable to remove any hidden newlines or spaces
+CLEAN_IP=$(echo "$PUBLIC_IP" | tr -d '[:space:]')
+
 mkdir -p /etc/headscale
 if [ -f /etc/headscale/config.yaml ]; then
-  sed -i "s|^server_url:.*|server_url: http://$PUBLIC_IP:8080|g" /etc/headscale/config.yaml
+  sed -i "s|^server_url:.*|server_url: http://$CLEAN_IP:8080|g" /etc/headscale/config.yaml
   sed -i "s|listen_addr: 127.0.0.1:8080|listen_addr: 0.0.0.0:8080|g" /etc/headscale/config.yaml
 fi
 
