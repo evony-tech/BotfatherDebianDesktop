@@ -192,16 +192,27 @@ sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine "/home/$FARM_USER/Downloads
 # 12. Deploy Standalone Pale Moon Browser & Inject Native Flash Player
 echo "[+] Delivering un-throttled Linux NPAPI Flash Layer into System Nodes..."
 mkdir -p /usr/lib/mozilla/plugins/
-wget -q "https://github.com/darknebular/bypassing-flash-timebomb/releases/download/v1.0/libflashplayer.so" -O /usr/lib/mozilla/plugins/libflashplayer.so
-chmod 644 /usr/lib/mozilla/plugins/libflashplayer.so
-wget -q "https://relapi.palemoon.org/release/palemoon-33.4.0.1.linux-x86_64-gtk3.tar.xz" -O /tmp/palemoon.tar.xz || true
-tar -xf /tmp/palemoon.tar.xz -C /opt/ || true
-ln -sf /opt/palemoon/palemoon /usr/bin/palemoon || true
-rm -f /tmp/palemoon.tar.xz
 
+# Safely download and apply the Flash Player layer
+wget -q "https://github.com/darknebular/bypassing-flash-timebomb/releases/download/v1.0/libflashplayer.so" -O /usr/lib/mozilla/plugins/libflashplayer.so || true
+if [ -f /usr/lib/mozilla/plugins/libflashplayer.so ]; then
+    chmod 644 /usr/lib/mozilla/plugins/libflashplayer.so || true
+fi
+
+# Safely download and unpack Pale Moon
+wget -q "https://relapi.palemoon.org/release/palemoon-33.4.0.1.linux-x86_64-gtk3.tar.xz" -O /tmp/palemoon.tar.xz || true
+if [ -f /tmp/palemoon.tar.xz ]; then
+    tar -xf /tmp/palemoon.tar.xz -C /opt/ || true
+    ln -sf /opt/palemoon/palemoon /usr/bin/palemoon || true
+    rm -f /tmp/palemoon.tar.xz
+fi
+
+# Initialize Pale Moon to force it to generate the default profile directories
 mkdir -p "/home/$FARM_USER/.moonchild productions/pale moon"
-sudo -u "$FARM_USER" HOME="/home/$FARM_USER" xvfb-run -a /opt/palemoon/palemoon --headless & PM_PID=$!; sleep 4; kill $PM_PID || true
-PM_PROFILE=$(ls "/home/$FARM_USER/.moonchild productions/pale moon" | grep default)
+sudo -u "$FARM_USER" HOME="/home/$FARM_USER" xvfb-run -a /usr/bin/palemoon --headless & PM_PID=$!; sleep 4; kill $PM_PID || true
+
+# Safely grep for the default profile without tripping the set -e killswitch
+PM_PROFILE=$(ls "/home/$FARM_USER/.moonchild productions/pale moon" 2>/dev/null | grep default | head -n 1 || true)
 if [ ! -z "$PM_PROFILE" ]; then
 cat << 'EOF' >> "/home/$FARM_USER/.moonchild productions/pale moon/$PM_PROFILE/prefs.js"
 user_pref("browser.startup.homepage", "http://forum.neatportal.com/viewtopic.php?f=49&t=6747");
@@ -209,7 +220,6 @@ user_pref("browser.startup.page", 1);
 EOF
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/.moonchild productions"
 fi
-
 # 13. Override Wine Browser: Global Split Routing Tunnel to Native Linux Pale Moon
 echo "[+] Intercepting Wine URL triggers and redirecting out to native system..."
 sudo -u "$FARM_USER" wineserver -k || true
