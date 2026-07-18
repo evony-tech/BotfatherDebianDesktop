@@ -184,6 +184,7 @@ sleep 2
 
 # 11. Download and Install TheNEATBotfather
 echo "[+] Fetching and installing TheNEATBotfather..."
+mkdir -p "/home/$FARM_USER/Downloads"
 wget -q "https://github.com/evony-tech/NeatBotfather/releases/download/1.9.6.5/TheNEATBotfather_v1.9.6.5_Setup.exe" -O "/home/$FARM_USER/Downloads/Botfather-Setup.exe" || true
 chown -R "$FARM_USER:$FARM_USER" "/home/$FARM_USER/Downloads"
 sudo -u "$FARM_USER" WINEDEBUG=-all xvfb-run -a wine "/home/$FARM_USER/Downloads/Botfather-Setup.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- || true
