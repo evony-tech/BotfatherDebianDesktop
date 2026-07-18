@@ -19,7 +19,10 @@ echo "========================================================="
 # 1. Unattended Configuration Details
 # FIXED: Swapped curl for wget to support barebones Debian ISOs
 PUBLIC_IP=$(wget -4 -qO- https://ifconfig.me || wget -4 -qO- icanhazip.com || echo "127.0.0.1")
-echo "[+] Detected Public IP: $PUBLIC_IP"
+# Sanitize the IP right away to strip any hidden newlines or spaces
+CLEAN_IP=$(echo "$PUBLIC_IP" | tr -d '[:space:]')
+if [ -z "$CLEAN_IP" ]; then CLEAN_IP="127.0.0.1"; fi
+echo "[+] Detected Public IP: $CLEAN_IP"
 
 # Use environment variables if set, otherwise fallback to defaults
 FARM_USER=${FARM_USER:-"botfarmer"}
@@ -67,16 +70,20 @@ if [ ! -f /usr/bin/headscale ]; then
   rm headscale_0.29.2_linux_amd64.deb
 fi
 
-# Sanitize the IP variable to remove any hidden newlines or spaces
-CLEAN_IP=$(echo "$PUBLIC_IP" | tr -d '[:space:]')
-
 mkdir -p /etc/headscale
 if [ -f /etc/headscale/config.yaml ]; then
-  sed -i "s|^server_url:.*|server_url: http://$CLEAN_IP:8080|g" /etc/headscale/config.yaml
+  # Wrap the URL in double-quotes to protect the YAML parser from bare colons
+  sed -i "s|^server_url:.*|server_url: \"http://$CLEAN_IP:8080\"|g" /etc/headscale/config.yaml
   sed -i "s|listen_addr: 127.0.0.1:8080|listen_addr: 0.0.0.0:8080|g" /etc/headscale/config.yaml
 fi
 
 systemctl enable --now headscale
+systemctl restart headscale
+
+# Wait 3 seconds to ensure the service is fully booted before throwing commands at it
+sleep 3
+
+# Create the user (This automatically assigns them ID 1)
 headscale users create botuser || true
 
 # 6. Bind the Host to its Private Network
@@ -86,17 +93,18 @@ if [ ! -f /usr/bin/tailscale ]; then
   wget -qO- https://tailscale.com/install.sh | sh
 fi
 
-# Generate the pre-auth key for this server to join the mesh
-HOST_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h)
+# Generate the pre-auth key using the numeric ID (1) instead of the string name
+HOST_AUTH_KEY=$(headscale preauthkeys create --user 1 --expiration 24h)
 
-# Start Tailscale silently using that key
-tailscale up --login-server="http://${CLEAN_IP}:8080" --authkey="${HOST_AUTH_KEY}"
+# Start Tailscale silently using the local loopback and the new key
+tailscale up --login-server="http://127.0.0.1:8080" --authkey="${HOST_AUTH_KEY}"
 
 # Capture the newly assigned VPN IP
 VPN_IP=$(tailscale ip -4 || echo "100.64.0.1")
+VPN_IP=$(echo "$VPN_IP" | tr -d '[:space:]')
 
 # Generate a second one-time key for the user's home Windows machine
-HOME_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h)
+HOME_AUTH_KEY=$(headscale preauthkeys create --user 1 --expiration 24h)
 
 # 7. Apply the UFW Firewall Security Hardening
 echo "[+] Resetting and locking down Firewall boundaries..."
@@ -313,7 +321,7 @@ cat << EOF > /root/botfarm_setup_instructions.txt
  1. Install Tailscale on your Home PC (tailscale.com/download)
  2. Open Command Prompt (cmd.exe) on your Home PC and paste this exact command:
 
-    tailscale up --login-server http://$PUBLIC_IP:8080 --authkey $HOME_AUTH_KEY
+    tailscale up --login-server http://$CLEAN_IP:8080 --authkey $HOME_AUTH_KEY
 
  3. Once connected, open Remote Desktop Connection (mstsc.exe).
  4. Enter $VPN_IP
