@@ -17,10 +17,9 @@ echo "  Deploying Hardened XFCE + Auto-Login + Wine Bot Farm   "
 echo "========================================================="
 
 # 1. Unattended Configuration Details
-# FIXED: Swapped curl for wget to support barebones Debian ISOs
-PUBLIC_IP=$(wget -4 -qO- https://ifconfig.me || wget -4 -qO- icanhazip.com || echo "127.0.0.1")
-# Sanitize the IP right away to strip any hidden newlines or spaces
-CLEAN_IP=$(echo "$PUBLIC_IP" | tr -d '[:space:]')
+# FIXED: Bulletproof IPv4 Extraction (Strips all HTML/Proxy garbage)
+RAW_IP=$(wget -4 -qO- https://api.ipify.org || wget -4 -qO- https://ifconfig.me || echo "127.0.0.1")
+CLEAN_IP=$(echo "$RAW_IP" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
 if [ -z "$CLEAN_IP" ]; then CLEAN_IP="127.0.0.1"; fi
 echo "[+] Detected Public IP: $CLEAN_IP"
 
@@ -72,8 +71,7 @@ fi
 
 mkdir -p /etc/headscale
 if [ -f /etc/headscale/config.yaml ]; then
-  # Wrap the URL in double-quotes to protect the YAML parser from bare colons
-  sed -i "s|^server_url:.*|server_url: \"http://$CLEAN_IP:8080\"|g" /etc/headscale/config.yaml
+  sed -i "s|^server_url:.*|server_url: http://$CLEAN_IP:8080|g" /etc/headscale/config.yaml
   sed -i "s|listen_addr: 127.0.0.1:8080|listen_addr: 0.0.0.0:8080|g" /etc/headscale/config.yaml
 fi
 
