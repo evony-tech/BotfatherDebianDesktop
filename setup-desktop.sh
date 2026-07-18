@@ -86,10 +86,17 @@ if [ ! -f /usr/bin/tailscale ]; then
   wget -qO- https://tailscale.com/install.sh | sh
 fi
 
-HOST_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h --output json 2>/dev/null | jq -r '.key' 2>/dev/null || headscale preauthkeys create --user botuser --expiration 24h | awk '{print $NF}')
-tailscale up --login-server http://127.0.0.1:8080 --authkey "$HOST_AUTH_KEY" || true
+# Generate the pre-auth key for this server to join the mesh
+HOST_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h)
+
+# Start Tailscale silently using that key
+tailscale up --login-server="http://${CLEAN_IP}:8080" --authkey="${HOST_AUTH_KEY}"
+
+# Capture the newly assigned VPN IP
 VPN_IP=$(tailscale ip -4 || echo "100.64.0.1")
-HOME_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h --output json 2>/dev/null | jq -r '.key' 2>/dev/null || headscale preauthkeys create --user botuser --expiration 24h | awk '{print $NF}')
+
+# Generate a second one-time key for the user's home Windows machine
+HOME_AUTH_KEY=$(headscale preauthkeys create --user botuser --expiration 24h)
 
 # 7. Apply the UFW Firewall Security Hardening
 echo "[+] Resetting and locking down Firewall boundaries..."
